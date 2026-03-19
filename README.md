@@ -1,73 +1,67 @@
 # mssgen
 Micro SSG Generator. 簡単な仕組みの静的サイトジェネレーターです。
 
-
+📝 mssgen 実装企画書 (v2: Recursive & Root-based)
 1. プロジェクト概要
 名称: mssgen (Minimal Static Site Generator)
 
-目的: シンプルな {key} 置換と {{parts}} 埋め込み機能を備えた、超軽量な静的サイト生成ツール。
+コンセプト: 「設定ファイルひとつで、プロジェクト全体をテンプレート化する」超軽量ツール。
 
-主要ターゲット: Cloudflare Pages + GitHub Actions で複数のランディングページやサブドメインサイトを効率よく管理したい開発者。
+特徴: 特定の src フォルダを必要とせず、カレントディレクトリ全体を処理対象とする。
 
-2. コア機能 (Core Features)
-Variable Injection ({key}): setting.json に定義された値を HTML/JS/CSS 内の {KEY_NAME} と置換する。
+2. コア機能
+Variable Injection ({key}): setting.json の値を、全テキストファイルの {KEY} 箇所に埋め込む。
 
-Component Embedding ({{parts}}): src/common/*.html の中身を、メインファイルの {{filename}} 箇所に埋め込む。
+Component Embedding ({{parts}}): common/ 内のファイルを {{filename}} で呼び出し、再帰的に展開する。
 
-Build Mode: src/ フォルダ内のファイルを一括処理し、dist/ フォルダに出力する。
+Recursive Build: サブディレクトリ構造を維持したまま dist/ へ出力。
 
-Dev Mode (Live Reload): ファイルの変更を監視（Watch）し、自動ビルドとブラウザの即時リフレッシュを行う。
+Smart Copy: テキストファイルは置換処理を行い、画像などのバイナリファイルはそのままコピーする。
 
-CLI Interface: npx mssgen（ビルド）および npx mssgen dev（開発モード）で動作する。
+Dev Mode: ルート内の変更を監視し、ライブリロード。
 
-3. ディレクトリ構造 (Expected Structure)
+3. ディレクトリ構造 (Example)
 Plaintext
 . (Project Root)
-├── src/                # ソースファイル (html, js, css)
-│   ├── index.html      # {TITLE} や {{header}} を含む
-│   └── common/         # 共通パーツ
-│       ├── header.html
-│       └── footer.html
-├── dist/               # ビルド済みファイル (Auto-generated)
-├── setting.json        # 置換用データ
-└── package.json        # npm設定
-4. 技術スタック (Tech Stack)
-Runtime: Node.js
+├── index.html        # 置換対象
+├── sub-page/
+│   └── info.html     # 再帰的に置換・出力対象
+├── assets/
+│   └── logo.png      # バイナリはそのままコピー
+├── common/           # 共通パーツ（distには出力しない）
+│   └── header.html
+├── setting.json      # 置換データ
+└── dist/             # 自動生成される出力先
+4. 実装詳細ルール
+対象外 (Ignore): dist/, node_modules/, .git/, common/, setting.json, package.json, package-lock.json は処理およびコピーの対象外とする。
 
-Dependencies:
+バイナリ判定: 拡張子（.jpg, .png, .gif, .pdf, .zip 等）または is-binary-path 的なロジックで判定し、バイナリは置換を通さず fs.copyFileSync する。
 
-browser-sync: ローカルサーバー & ライブリロード用
+置換順序: 常に {{parts}} → {key} の順。
 
-chokidar: 高性能ファイル監視用
-
-Distribution: npm package (CLI tool)
-
-5. 実装詳細ルール
-置換順序: {{parts}}（パーツ埋め込み）を先に処理し、その後に {key}（文字列置換）を処理すること。これにより、共通パーツ内に書かれた変数も正しく置換される。
-
-ファイル対象: src/ 直下のファイルのみを dist/ に出力し、common/ などのサブディレクトリは出力に含めない。
-
-正規表現: * Parts: /{{(.*?)}}/g
-
-Settings: /{(.*?)}/g (または setting.json のキーに基づく動的生成)
-
-6. Codex への指示用プロンプト (Prompt for Implementation)
+5. Codex への指示用プロンプト
 "mssgen" という名前の Node.js 製 CLI ツールを作成してください。
 
 要件:
 
-bin/cli.js を作成し、mssgen（ビルド実行）と mssgen dev（ブラウザ同期開発）のコマンドを使えるようにしてください。
+実行環境: bin/cli.js をエントリポイントとし、mssgen でビルド、mssgen dev で開発モードを起動。
 
-lib/builder.js にコアロジックを実装してください。
+再帰的ビルド (lib/builder.js):
 
-process.cwd() を基準に src/ から読み込み、dist/ へ書き出します。
+process.cwd()（ルート）の全ファイルを再帰的に走査し、dist/ に構造を維持して出力。
 
-src/common/ 内のファイルを {{fileName}} の形式で読み込んで埋め込む機能。
+除外: dist, node_modules, .git, common, setting.json, package.json は無視。
 
-setting.json 内のキーと値を {KEY} の形式で置換する機能。
+置換処理:
 
-dev モードでは browser-sync を使用し、src/ または setting.json が変更されたら再ビルドしてブラウザをリロードしてください。
+common/ 内のファイルを {{fileName}} で埋め込む。
 
-package.json に bin フィールドを設定し、dependencies に browser-sync と chokidar を含めてください。
+setting.json の値を {KEY} 形式で置換する。
 
-コードはシンプルで、エラーハンドリング（ファイルがない場合の警告など）を含めてください。
+バイナリ対応: 画像等のバイナリファイルは置換処理をスキップし、そのままコピー。
+
+開発モード: chokidar でルートを監視。変更があれば再ビルドし、browser-sync でブラウザをリロード。
+
+エラーハンドリング: setting.json が読み込めない場合や、common/ パーツが見つからない場合は警告を出すが、処理は続行すること。
+
+依存関係: browser-sync, chokidar, is-binary-path (または同等の判定ロジック) を使用。
