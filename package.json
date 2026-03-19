@@ -11,8 +11,5 @@
     "build": "node bin/cli.js",
     "dev": "node bin/cli.js dev",
     "test": "node --test test/*.test.js"
-  },
-  "dependencies": {
-    "chokidar": "^4.0.3"
   }
 }

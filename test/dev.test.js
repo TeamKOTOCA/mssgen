@@ -6,8 +6,13 @@ const path = require('node:path');
 const http = require('node:http');
 
 const {
+  WATCH_DEBOUNCE_MS,
+  WATCH_POLL_INTERVAL_MS,
   build,
   createDevServer,
+  createWatcher,
+  createWatcherSnapshot,
+  diffWatcherSnapshots,
   injectLiveReloadSnippet,
   resolveRequestPath,
 } = require('../lib/builder');
@@ -57,4 +62,54 @@ test('dev server injects live reload script into html responses', async () => {
 
   server.close();
   assert.match(body, /__mssgen\/livereload/);
+});
+
+
+test('diffWatcherSnapshots detects add, change, and unlink events in order', () => {
+  const previousSnapshot = new Map([
+    ['about.html', 1],
+    ['guide/index.html', 2],
+  ]);
+  const nextSnapshot = new Map([
+    ['about.html', 3],
+    ['contact.html', 4],
+  ]);
+
+  assert.deepEqual(diffWatcherSnapshots(previousSnapshot, nextSnapshot), [
+    { eventName: 'change', relativePath: 'about.html' },
+    { eventName: 'add', relativePath: 'contact.html' },
+    { eventName: 'unlink', relativePath: 'guide/index.html' },
+  ]);
+});
+
+test('createWatcher watches source files without reacting to dist output', async () => {
+  const rootDir = makeTempProject();
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>ok</body></html>');
+  build(rootDir);
+
+  const initialSnapshot = createWatcherSnapshot(rootDir);
+  assert.deepEqual([...initialSnapshot.keys()], ['index.html']);
+
+  const watcher = createWatcher(rootDir);
+  const events = [];
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      watcher.close();
+      reject(new Error('watcher did not emit a change event'));
+    }, WATCH_POLL_INTERVAL_MS * 6);
+
+    watcher.on('all', (eventName, filePath) => {
+      events.push({ eventName, relativePath: path.relative(rootDir, filePath) });
+      clearTimeout(timeout);
+      watcher.close();
+      resolve();
+    });
+
+    fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>updated</body></html>');
+    fs.writeFileSync(path.join(rootDir, 'dist', 'index.html'), 'ignored output');
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, WATCH_DEBOUNCE_MS + 20));
+  assert.deepEqual(events, [{ eventName: 'change', relativePath: 'index.html' }]);
 });
