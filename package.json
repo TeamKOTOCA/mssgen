@@ -13,7 +13,6 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
-    "browser-sync": "^3.0.4",
     "chokidar": "^4.0.3"
   }
 }
