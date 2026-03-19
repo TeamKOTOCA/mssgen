@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { build, getSourceFiles, injectParts, shouldIgnoreRelativePath } = require('../lib/builder');
+const { build, getSourceFiles, init, injectParts, shouldIgnoreRelativePath } = require('../lib/builder');
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mssgen-'));
@@ -69,4 +69,22 @@ test('build writes text replacements recursively and copies binary files', () =>
     fs.readFileSync(path.join(rootDir, 'dist', 'assets', 'logo.png')),
     Buffer.from([0, 1, 2, 3]),
   );
+});
+
+
+test('init creates the required project scaffold without overwriting existing files', () => {
+  const rootDir = makeTempDir();
+  fs.writeFileSync(path.join(rootDir, 'index.html'), 'custom');
+
+  const createdPaths = init(rootDir).sort();
+
+  assert.deepEqual(createdPaths, [
+    'common/footer.html',
+    'common/header.html',
+    'setting.json',
+  ]);
+  assert.equal(fs.readFileSync(path.join(rootDir, 'index.html'), 'utf8'), 'custom');
+  assert.match(fs.readFileSync(path.join(rootDir, 'setting.json'), 'utf8'), /SITE_NAME/);
+  assert.equal(fs.existsSync(path.join(rootDir, 'common', 'header.html')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, 'common', 'footer.html')), true);
 });
