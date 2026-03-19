@@ -65,3 +65,8 @@ setting.json の値を {KEY} 形式で置換する。
 エラーハンドリング: setting.json が読み込めない場合や、common/ パーツが見つからない場合は警告を出すが、処理は続行すること。
 
 依存関係: chokidar, is-binary-path (または同等の判定ロジック) を使用。
+
+## CLI
+- `mssgen init`: `setting.json`, `common/`, `common/header.html`, `common/footer.html`, `index.html` のひな形を不足分だけ作成します。
+- `mssgen`: 現在のプロジェクトを `dist/` にビルドします。
+- `mssgen dev`: 監視付きの開発サーバーを起動します。
