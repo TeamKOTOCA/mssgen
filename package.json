@@ -1,7 +1,7 @@
 {
   "name": "mssgen",
   "version": "1.0.0",
-  "description": "Minimal static site generator with parts and variable replacement",
+  "description": "Minimal static site generator with recursive root-based build",
   "bin": {
     "mssgen": "bin/cli.js"
   },
@@ -9,7 +9,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "node bin/cli.js",
-    "dev": "node bin/cli.js dev"
+    "dev": "node bin/cli.js dev",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "browser-sync": "^3.0.3",
