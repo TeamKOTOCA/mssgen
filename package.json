@@ -1,6 +1,6 @@
 {
   "name": "mssgen",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Minimal static site generator with recursive root-based build",
   "bin": {
     "mssgen": "bin/cli.js"
