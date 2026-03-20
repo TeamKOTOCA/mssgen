@@ -42,7 +42,7 @@ test('resolveRequestPath serves directories and extensionless routes from dist',
 test('dev server injects live reload script into html responses', async () => {
   const rootDir = makeTempProject();
   fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>ok</body></html>');
-  build(rootDir);
+  await build(rootDir);
 
   const { server } = createDevServer(rootDir);
 
@@ -82,34 +82,50 @@ test('diffWatcherSnapshots detects add, change, and unlink events in order', () 
   ]);
 });
 
-test('createWatcher watches source files without reacting to dist output', async () => {
+test('createWatcher watches source files, common parts, and settings without reacting to dist output', async () => {
   const rootDir = makeTempProject();
   fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>ok</body></html>');
-  build(rootDir);
+  fs.mkdirSync(path.join(rootDir, 'common'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'common', 'header.html'), '<header>ok</header>');
+  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ TITLE: 'ok' }));
+  await build(rootDir);
 
   const initialSnapshot = createWatcherSnapshot(rootDir);
-  assert.deepEqual([...initialSnapshot.keys()], ['index.html']);
+  assert.deepEqual([...initialSnapshot.keys()].sort(), ['common/header.html', 'index.html', 'setting.json']);
 
-  const watcher = createWatcher(rootDir);
-  const events = [];
-
-  await new Promise((resolve, reject) => {
+  const collectSingleEvent = (mutate) => new Promise((resolve, reject) => {
+    const watcher = createWatcher(rootDir);
     const timeout = setTimeout(() => {
       watcher.close();
       reject(new Error('watcher did not emit a change event'));
     }, WATCH_POLL_INTERVAL_MS * 6);
 
     watcher.on('all', (eventName, filePath) => {
-      events.push({ eventName, relativePath: path.relative(rootDir, filePath) });
       clearTimeout(timeout);
       watcher.close();
-      resolve();
+      resolve({ eventName, relativePath: path.relative(rootDir, filePath) });
     });
 
+    setTimeout(mutate, WATCH_POLL_INTERVAL_MS);
+  });
+
+  const sourceEvent = await collectSingleEvent(() => {
     fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>updated</body></html>');
     fs.writeFileSync(path.join(rootDir, 'dist', 'index.html'), 'ignored output');
   });
-
   await new Promise((resolve) => setTimeout(resolve, WATCH_DEBOUNCE_MS + 20));
-  assert.deepEqual(events, [{ eventName: 'change', relativePath: 'index.html' }]);
+
+  const partEvent = await collectSingleEvent(() => {
+    fs.writeFileSync(path.join(rootDir, 'common', 'header.html'), '<header>updated</header>');
+  });
+  await new Promise((resolve) => setTimeout(resolve, WATCH_DEBOUNCE_MS + 20));
+
+  const settingsEvent = await collectSingleEvent(() => {
+    fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ TITLE: 'updated' }));
+  });
+  await new Promise((resolve) => setTimeout(resolve, WATCH_DEBOUNCE_MS + 20));
+
+  assert.deepEqual(sourceEvent, { eventName: 'change', relativePath: 'index.html' });
+  assert.deepEqual(partEvent, { eventName: 'change', relativePath: 'common/header.html' });
+  assert.deepEqual(settingsEvent, { eventName: 'change', relativePath: 'setting.json' });
 });
