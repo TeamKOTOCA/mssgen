@@ -11,5 +11,8 @@
     "build": "node bin/cli.js",
     "dev": "node bin/cli.js dev",
     "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "sharp": "^0.34.0"
   }
 }

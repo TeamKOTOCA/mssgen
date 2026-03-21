@@ -33,7 +33,7 @@
 - ビルド対象外: `dist/`, `node_modules/`, `.git/`, `common/`, `setting.json`, `package.json`, `package-lock.json`
 - 監視対象外: `dist/`, `node_modules/`, `.git/`, `package.json`, `package-lock.json`（`common/`, `setting.json` はライブリロード対象）
 - 置換順序: 常に `{{parts}}` → `{key}` → 画像参照の `.webp` 置換
-- 画像変換: `png`, `jpg`, `jpeg` はビルド時に `webp` へ変換し、HTML/CSS/JS 内のローカル参照も追従させる
+- 画像変換: `png`, `jpg`, `jpeg` はビルド時に `sharp` で `webp` へ変換し、HTML/CSS/JS 内のローカル参照も追従させる
 - バイナリ判定: 画像や圧縮ファイルなどは置換を通さずコピー
 - エラー方針: `setting.json` の読み込み失敗や `common/` パーツ未検出は警告を出して継続
 

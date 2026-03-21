@@ -4,6 +4,20 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==';
+const JPEG_BASE64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQEBUQEBAVFhUVFRUVFRUVFRUVFRUVFRUXFhUVFRUYHSggGBolHRUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGxAQGy0lICUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAAEAAQMBIgACEQEDEQH/xAAXAAADAQAAAAAAAAAAAAAAAAAAAQID/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEAMQAAAB6AAAAP/EABQQAQAAAAAAAAAAAAAAAAAAACD/2gAIAQEAAT8Af//EABQRAQAAAAAAAAAAAAAAAAAAACD/2gAIAQIBAT8Af//EABQRAQAAAAAAAAAAAAAAAAAAACD/2gAIAQMBAT8Af//Z';
+
+globalThis.__MSSGEN_TEST_SHARP__ = (inputPath) => ({
+  webp() {
+    return {
+      async toFile(outputPath) {
+        const source = fs.readFileSync(inputPath);
+        fs.writeFileSync(outputPath, Buffer.concat([Buffer.from('WEBP'), source]));
+      },
+    };
+  },
+});
+
 const {
   build,
   getSourceFiles,
@@ -16,9 +30,6 @@ const {
   shouldIgnoreRelativePath,
   splitResourceSuffix,
 } = require('../lib/builder');
-
-const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==';
-const JPEG_FIXTURE_PATH = '/root/.pyenv/versions/3.11.14/lib/python3.11/test/imghdrdata/python.jpg';
 
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mssgen-'));
@@ -54,7 +65,6 @@ test('getSourceFiles collects project files recursively while keeping ignored pa
 
   assert.deepEqual(files, ['index.html', 'sub/info.html']);
 });
-
 
 test('injectBuiltByComment adds the marker once to html output', () => {
   assert.equal(
@@ -114,7 +124,7 @@ test('build converts png and jpg assets to webp and rewrites html/css/js referen
   fs.writeFileSync(path.join(rootDir, 'common', 'nested', 'footer.html'), '<footer>{TITLE}</footer>');
   fs.mkdirSync(path.join(rootDir, 'assets'), { recursive: true });
   fs.writeFileSync(path.join(rootDir, 'assets', 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
-  fs.copyFileSync(JPEG_FIXTURE_PATH, path.join(rootDir, 'assets', 'photo.jpg'));
+  fs.writeFileSync(path.join(rootDir, 'assets', 'photo.jpg'), Buffer.from(JPEG_BASE64, 'base64'));
   fs.writeFileSync(
     path.join(rootDir, 'assets', 'app.js'),
     'const hero = "./photo.jpg"; document.body.style.backgroundImage = "url(../assets/logo.png)";',
