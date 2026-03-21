@@ -1,0 +1,30 @@
+name: Node.js Package Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # ここが重要：OIDCトークンを発行するための権限設定
+    permissions:
+      contents: read
+      id-token: write 
+      
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # トークンを指定せず、プロバンス（出所証明）を付けてパブリッシュ
+      - run: npm publish --provenance --access public
+        env:
+          # NODE_AUTH_TOKEN は不要になります
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # 既存の設定がある場合も、Trusted Publishingが優先されます
