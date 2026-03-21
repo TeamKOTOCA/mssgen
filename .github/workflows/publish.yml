@@ -25,6 +25,3 @@ jobs:
 
       # トークンを指定せず、プロバンス（出所証明）を付けてパブリッシュ
       - run: npm publish --provenance --access public
-        env:
-          # NODE_AUTH_TOKEN は不要になります
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # 既存の設定がある場合も、Trusted Publishingが優先されます
