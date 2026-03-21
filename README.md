@@ -1,43 +1,87 @@
 # mssgen
 
-mssgen は、プロジェクトのルートディレクトリをそのまま入力にできる、最小構成の静的サイトジェネレーターです。
+mssgen は、HTML をそのまま書きながら静的サイトを組み立てられる、シンプルな npm 製 CLI ツールです。
 
-## 特徴
-- `index.html` やサブディレクトリ内の HTML を再帰的に `dist/` へ出力
-- `common/` 内のパーツを `{{header.html}}` のように埋め込み可能
-- `setting.json` の値を `{SITE_NAME}` のようなプレースホルダーへ置換
-- `png` / `jpg` / `jpeg` は `sharp` で `webp` に変換して軽量化
-- HTML / CSS / JS 内のローカル画像リンクも `.webp` へ自動更新
-- `mssgen dev` でライブリロードつきの開発サーバーを利用可能
+- `npm install mssgen` で使い始められる
+- `npx mssgen` / `npx mssgen dev` ですぐ試せる
+- `common/` に共通パーツを置いて `{{header.html}}` のように読み込める
+- `setting.json` の値を `{SITE_NAME}` のようなプレースホルダーへ差し込める
+- `png` / `jpg` / `jpeg` を `webp` に変換し、ローカル参照も自動で `.webp` に更新できる
 
 ## インストール
 
-### ローカルで試す
+### いちばん手軽な使い方
+プロジェクトに追加して、`npx` で実行します。
+
 ```bash
-npm install
+npm install mssgen
+npx mssgen init
+npx mssgen dev
 ```
 
-### CLI として使う
+ビルドだけしたいときは次を実行します。
+
 ```bash
-npm install -g .
+npx mssgen
 ```
 
-## 使い方
-
-### 1. ひな形を作る
-空のプロジェクト、または既存のサイト用ディレクトリで次を実行します。
+### グローバルに入れる場合
+普段から CLI として使いたい場合はグローバルインストールもできます。
 
 ```bash
+npm install -g mssgen
 mssgen init
+mssgen dev
 ```
 
-未作成のときだけ、以下のひな形が追加されます。
+## 最短スタート
+
+### 1. サイト用ディレクトリを作る
+新規ディレクトリでも、既存の HTML プロジェクトでも使えます。
+
+```bash
+mkdir my-site
+cd my-site
+npm init -y
+npm install mssgen
+npx mssgen init
+```
+
+`mssgen init` は、不足している次のファイルだけを作成します。
+
 - `setting.json`
 - `common/header.html`
 - `common/footer.html`
 - `index.html`
 
-### 2. `setting.json` を用意する
+### 2. 開発サーバーを起動する
+
+```bash
+npx mssgen dev
+```
+
+- デフォルトでは `http://127.0.0.1:3000` で起動します
+- ファイル変更を監視し、再ビルド後にブラウザを自動リロードします
+- ポートは環境変数 `MSSGEN_PORT` で変更できます
+
+例:
+
+```bash
+MSSGEN_PORT=4000 npx mssgen dev
+```
+
+### 3. 本番用にビルドする
+
+```bash
+npx mssgen
+```
+
+ビルド結果は `dist/` に出力されます。
+
+## 書き方
+
+### `setting.json`
+
 ```json
 {
   "SITE_NAME": "My Site",
@@ -45,8 +89,7 @@ mssgen init
 }
 ```
 
-### 3. パーツを `common/` に置く
-たとえば `common/header.html` を作成します。
+### `common/header.html`
 
 ```html
 <header>
@@ -55,7 +98,8 @@ mssgen init
 </header>
 ```
 
-### 4. ページからパーツと変数を使う
+### `index.html`
+
 ```html
 <!DOCTYPE html>
 <html lang="ja">
@@ -63,36 +107,38 @@ mssgen init
     {{header.html}}
     <main>
       <h2>{SITE_NAME} へようこそ</h2>
+      <p>ここに本文を書きます。</p>
     </main>
     {{footer.html}}
   </body>
 </html>
 ```
 
-### 5. ビルドする
-```bash
-mssgen
+## できること
+
+### 共通パーツの読み込み
+`common/` 配下の HTML を `{{...}}` で読み込めます。
+
+```html
+{{header.html}}
+{{nested/footer.html}}
 ```
 
-ビルドすると、ルート配下の対象ファイルが `dist/` に同じ構造で出力されます。`png` / `jpg` / `jpeg` は `sharp` で `webp` に変換され、HTML / CSS / JS 内の対応するローカル参照も自動で `.webp` に書き換えられます。
+### 変数の差し込み
+`setting.json` のキーを `{...}` で埋め込めます。
 
-## 開発サーバー
-
-```bash
-mssgen dev
+```html
+<title>{SITE_NAME}</title>
 ```
 
-- デフォルトでは `http://127.0.0.1:3000` で起動します
-- ファイル変更を監視し、ビルド後にブラウザを自動リロードします
-- ポートは環境変数 `MSSGEN_PORT` で変更できます
+### 画像の自動変換
+`png` / `jpg` / `jpeg` はビルド時に `webp` へ変換されます。
+さらに HTML / CSS / JS のローカル画像参照も、対応する場合は `.webp` に書き換えられます。
 
-例:
-```bash
-MSSGEN_PORT=4000 mssgen dev
-```
+## 出力されるもの
+mssgen はカレントディレクトリを再帰的に走査し、対象ファイルを `dist/` に同じ構造で出力します。
 
-## 処理対象と除外ルール
-mssgen はカレントディレクトリを再帰的に走査します。ビルド出力の対象外は以下です。
+ビルド対象からは次が除外されます。
 
 - `dist/`
 - `node_modules/`
@@ -102,14 +148,13 @@ mssgen はカレントディレクトリを再帰的に走査します。ビル�
 - `package.json`
 - `package-lock.json`
 
-`mssgen dev` のライブリロード監視では、`dist/` などの出力系を除いて `common/` と `setting.json` の変更も検知します。
-
 ## コマンド一覧
+
 - `mssgen init`: 初期ファイルを不足分だけ生成
-- `mssgen`: 本番用に `dist/` をビルド
+- `mssgen`: 本番用の `dist/` を生成
 - `mssgen dev`: 監視つき開発サーバーを起動
 
-## 補足
-- パーツ展開は `{{...}}`、変数置換は `{...}`、画像参照の `.webp` 置換はその後に処理されます
-- `common/` のパーツはサブディレクトリも扱えます。例: `{{nested/footer.html}}`
-- `README` とは別に、開発メモは `DEV.md` に移しています
+`npm install mssgen` で導入した場合は、`mssgen` の代わりに `npx mssgen` を使ってください。
+
+## 開発メモ
+開発者向けの補足は `DEV.md` にあります。
