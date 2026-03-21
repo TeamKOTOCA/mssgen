@@ -6,9 +6,8 @@ mssgen は、プロジェクトのルートディレクトリをそのまま入�
 - `index.html` やサブディレクトリ内の HTML を再帰的に `dist/` へ出力
 - `common/` 内のパーツを `{{header.html}}` のように埋め込み可能
 - `setting.json` の値を `{SITE_NAME}` のようなプレースホルダーへ置換
-- `png` / `jpg` / `jpeg` は `webp` に変換して軽量化
+- `png` / `jpg` / `jpeg` は `sharp` で `webp` に変換して軽量化
 - HTML / CSS / JS 内のローカル画像リンクも `.webp` へ自動更新
-- その他のバイナリファイルはそのままコピー
 - `mssgen dev` でライブリロードつきの開発サーバーを利用可能
 
 ## インストール
@@ -75,7 +74,7 @@ mssgen init
 mssgen
 ```
 
-ビルドすると、ルート配下の対象ファイルが `dist/` に同じ構造で出力されます。`png` / `jpg` / `jpeg` は `webp` に変換され、HTML / CSS / JS 内の対応するローカル参照も自動で `.webp` に書き換えられます。
+ビルドすると、ルート配下の対象ファイルが `dist/` に同じ構造で出力されます。`png` / `jpg` / `jpeg` は `sharp` で `webp` に変換され、HTML / CSS / JS 内の対応するローカル参照も自動で `.webp` に書き換えられます。
 
 ## 開発サーバー
 
