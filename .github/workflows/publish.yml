@@ -1,27 +1,53 @@
-name: Node.js Package Publish
+name: Publish package to npm
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
+    if: github.repository == 'TeamKOTOCA/mssgen' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    # ここが重要：OIDCトークンを発行するための権限設定
     permissions:
-      contents: read
-      id-token: write 
-      
+      contents: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v5
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          fetch-depth: 0
 
-      - run: npm install
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
 
-      # トークンを指定せず、プロバンス（出所証明）を付けてパブリッシュ
-      - run: npm publish --provenance --access public
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Bump package version
+        id: version
+        run: |
+          npm version patch -m "chore: release v%s [skip ci]"
+          echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        run: npm publish --access public
+
+      - name: Push release commit and tag
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git push origin HEAD:main --follow-tags
