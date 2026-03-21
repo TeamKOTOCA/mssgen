@@ -21,7 +21,7 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - run: npm ci
+      - run: npm install
 
       # トークンを指定せず、プロバンス（出所証明）を付けてパブリッシュ
       - run: npm publish --provenance --access public
