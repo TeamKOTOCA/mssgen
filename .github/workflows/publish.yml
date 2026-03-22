@@ -12,11 +12,12 @@ concurrency:
 
 jobs:
   publish:
+    # 既存の条件
     if: github.repository == 'TeamKOTOCA/mssgen' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
+      id-token: write # これが最重要：OIDC認証に必要です
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
@@ -42,7 +43,9 @@ jobs:
           echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        run: npm publish --access public
+        # --provenance をつけることで、GitHub Actionsから公開された証明が付きます
+        # Trusted Publisher設定済みなら、自動で認証されます
+        run: npm publish --access public --provenance
 
       - name: Push release commit and tag
         env:
