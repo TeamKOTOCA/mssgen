@@ -50,7 +50,9 @@ jobs:
           echo "version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
       
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push release commit and tag
         env:
