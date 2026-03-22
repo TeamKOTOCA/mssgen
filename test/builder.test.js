@@ -46,6 +46,7 @@ test('injectParts expands parts recursively', () => {
 
 test('shouldIgnoreRelativePath skips only global watch/build exclusions', () => {
   assert.equal(shouldIgnoreRelativePath('dist/index.html'), true);
+  assert.equal(shouldIgnoreRelativePath('.mssgen-cache/assets.json'), true);
   assert.equal(shouldIgnoreRelativePath('common/header.html'), false);
   assert.equal(shouldIgnoreRelativePath('setting.json'), false);
   assert.equal(shouldIgnoreRelativePath('sub/index.html'), false);
@@ -162,6 +163,75 @@ test('build converts png and jpg assets to webp and rewrites html/css/js referen
   assert.equal(shouldConvertImageToWebp('assets/logo.png'), true);
   assert.equal(shouldConvertImageToWebp('assets/photo.jpg'), true);
   assert.equal(getWebpRelativePath('assets/photo.jpg'), 'assets/photo.webp');
+});
+
+test('build keeps the previous dist contents available until the next build is ready', async () => {
+  const rootDir = makeTempDir();
+  const originalSharp = globalThis.__MSSGEN_TEST_SHARP__;
+
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<body>next</body>');
+  fs.mkdirSync(path.join(rootDir, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'assets', 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
+  fs.mkdirSync(path.join(rootDir, 'dist'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'dist', 'index.html'), 'previous build');
+
+  let releaseBuild;
+  globalThis.__MSSGEN_TEST_SHARP__ = (inputPath) => ({
+    webp() {
+      return {
+        async toFile(outputPath) {
+          await new Promise((resolve) => {
+            releaseBuild = resolve;
+          });
+          const source = fs.readFileSync(inputPath);
+          fs.writeFileSync(outputPath, Buffer.concat([Buffer.from('WEBP'), source]));
+        },
+      };
+    },
+  });
+
+  const buildPromise = build(rootDir);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  assert.equal(fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'), 'previous build');
+
+  releaseBuild();
+  await buildPromise;
+
+  globalThis.__MSSGEN_TEST_SHARP__ = originalSharp;
+
+  assert.match(fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'), /next/);
+});
+
+test('build reuses cached webp output when the source image is unchanged', async () => {
+  const rootDir = makeTempDir();
+  const originalSharp = globalThis.__MSSGEN_TEST_SHARP__;
+  let convertCount = 0;
+
+  globalThis.__MSSGEN_TEST_SHARP__ = (inputPath) => ({
+    webp() {
+      return {
+        async toFile(outputPath) {
+          convertCount += 1;
+          const source = fs.readFileSync(inputPath);
+          fs.writeFileSync(outputPath, Buffer.concat([Buffer.from('WEBP'), source]));
+        },
+      };
+    },
+  });
+
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<body><img src="./assets/logo.png"></body>');
+  fs.mkdirSync(path.join(rootDir, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'assets', 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
+
+  await build(rootDir);
+  await build(rootDir);
+
+  globalThis.__MSSGEN_TEST_SHARP__ = originalSharp;
+
+  assert.equal(convertCount, 1);
+  assert.equal(fs.existsSync(path.join(rootDir, '.mssgen-cache', 'assets.json')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, '.mssgen-cache', 'outputs', 'assets', 'logo.webp')), true);
 });
 
 test('init creates the required project scaffold without overwriting existing files', () => {
