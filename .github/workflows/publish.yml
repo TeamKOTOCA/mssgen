@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write # これが最重要：OIDC認証に必要です
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
