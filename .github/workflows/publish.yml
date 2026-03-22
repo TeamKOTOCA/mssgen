@@ -28,7 +28,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 20
-          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm install
@@ -52,8 +51,6 @@ jobs:
       
       - name: Publish to npm
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Trusted Publisher設定済みなら不要ですが、念のため
 
       - name: Push release commit and tag
         env:
