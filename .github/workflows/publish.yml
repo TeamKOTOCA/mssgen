@@ -39,18 +39,22 @@ jobs:
       - name: Bump package version
         id: version
         run: |
+          # npm version を実行する前に identity を設定する
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # これでコミットが可能になります
           npm version patch -m "chore: release v%s [skip ci]"
           echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
       - name: Publish to npm
-        # --provenance をつけることで、GitHub Actionsから公開された証明が付きます
-        # Trusted Publisher設定済みなら、自動で認証されます
         run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Trusted Publisher設定済みなら不要ですが、念のため
 
       - name: Push release commit and tag
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # configは上で設定済みなので push するだけでOK
           git push origin HEAD:main --follow-tags
