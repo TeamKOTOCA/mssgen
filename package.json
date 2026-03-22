@@ -6,6 +6,10 @@
     "type": "git",
     "url": "git+https://github.com/TeamKOTOCA/mssgen.git"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "bin": {
     "mssgen": "bin/cli.js"
   },
