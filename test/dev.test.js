@@ -64,10 +64,11 @@ test('dev server injects live reload script into html responses', async () => {
   assert.match(body, /__mssgen\/livereload/);
 });
 
-test('dev server waits for an in-progress build before serving files', async () => {
+test('dev server serves existing dist output immediately while a rebuild is in progress', async () => {
   const rootDir = makeTempProject();
   const distDir = path.join(rootDir, 'dist');
   fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'index.html'), '<html><body>stale</body></html>');
 
   let releaseBuild;
   const waitUntilReady = new Promise((resolve) => {
@@ -79,8 +80,50 @@ test('dev server waits for an in-progress build before serving files', async () 
   await new Promise((resolve) => server.listen(0, resolve));
   const { port } = server.address();
 
-  const requestPromise = new Promise((resolve, reject) => {
+  const startedAt = Date.now();
+  const response = await new Promise((resolve, reject) => {
     http.get(`http://127.0.0.1:${port}/`, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => resolve({
+        statusCode: res.statusCode,
+        body: data,
+        elapsedMs: Date.now() - startedAt,
+      }));
+    }).on('error', reject);
+  });
+
+  releaseBuild();
+  server.close();
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /stale/);
+  assert.ok(response.elapsedMs < 50);
+});
+
+test('dev server rebuilds once when a missing request arrives before the watcher rebuild finishes', async () => {
+  const rootDir = makeTempProject();
+  let buildCount = 0;
+
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>initial</body></html>');
+  await build(rootDir);
+  fs.mkdirSync(path.join(rootDir, 'guide'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'guide', 'index.html'), '<html><body>updated</body></html>');
+
+  const { server } = createDevServer(rootDir, {
+    triggerBuild: async () => {
+      buildCount += 1;
+      await build(rootDir);
+    },
+  });
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  const { port } = server.address();
+
+  const response = await new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}/guide/`, (res) => {
       let data = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => {
@@ -90,15 +133,10 @@ test('dev server waits for an in-progress build before serving files', async () 
     }).on('error', reject);
   });
 
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  fs.writeFileSync(path.join(distDir, 'index.html'), '<html><body>ready</body></html>');
-  releaseBuild();
-
-  const response = await requestPromise;
-
   server.close();
+  assert.equal(buildCount, 1);
   assert.equal(response.statusCode, 200);
-  assert.match(response.body, /ready/);
+  assert.match(response.body, /updated/);
 });
 
 
