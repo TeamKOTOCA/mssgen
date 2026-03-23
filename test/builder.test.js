@@ -37,7 +37,7 @@ function makeTempDir() {
 }
 
 
-test('injectNamedBlocks expands named blocks recursively and keeps local definition values', () => {
+test('injectNamedBlocks expands named blocks recursively without colliding with parts syntax', () => {
   const result = injectNamedBlocks([
     '{{{{ hero }}}}',
     '{{{ name: hero;<section>{{{{ title }}}} {{header}}</section>}}}',
@@ -47,7 +47,7 @@ test('injectNamedBlocks expands named blocks recursively and keeps local definit
     title: 'Welcome',
   });
 
-  assert.equal(result, '<main>Welcome</main><section>Welcome {{header}}</section>Hello');
+  assert.equal(result, '<main>Welcome</main>');
 });
 
 test('injectParts expands parts recursively', () => {
@@ -146,7 +146,7 @@ test('rewriteAssetReferences updates local image links to webp', () => {
 });
 
 
-test('build collects named blocks across files and keeps definition values in output', async () => {
+test('build collects named blocks across files and strips definitions from output', async () => {
   const rootDir = makeTempDir();
 
   fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ SITE_NAME: 'Docs' }));
@@ -172,7 +172,7 @@ test('build collects named blocks across files and keeps definition values in ou
 
   assert.equal(
     fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'),
-    `<section class="hero">Fast build</section><body><header>Fast build - Docs</header> <section class="hero">Fast build</section><!-- built by mssgen -->\n</body>`,
+    `<body><header>Fast build - Docs</header> <section class="hero">Fast build</section><!-- built by mssgen -->\n</body>`,
   );
   assert.equal(
     fs.readFileSync(path.join(rootDir, 'dist', 'about.html'), 'utf8'),
