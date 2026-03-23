@@ -30,6 +30,7 @@ const {
   shouldConvertImageToWebp,
   shouldIgnoreRelativePath,
   splitResourceSuffix,
+  stripNamedBlockDefinitions,
 } = require('../lib/builder');
 
 function makeTempDir() {
@@ -47,7 +48,15 @@ test('injectNamedBlocks expands named blocks recursively without colliding with 
     title: 'Welcome',
   });
 
-  assert.equal(result, '<main>Welcome</main>');
+  assert.equal(result, '<main>Welcome</main><section>Welcome {{header}}</section>Hello');
+});
+
+
+test('stripNamedBlockDefinitions leaves the block content in place', () => {
+  assert.equal(
+    stripNamedBlockDefinitions('<div>{{{ name: hero;<section>Hi</section>}}}</div>'),
+    '<div><section>Hi</section></div>',
+  );
 });
 
 test('injectParts expands parts recursively', () => {
@@ -146,7 +155,7 @@ test('rewriteAssetReferences updates local image links to webp', () => {
 });
 
 
-test('build collects named blocks across files and strips definitions from output', async () => {
+test('build collects named blocks across files while leaving definition contents in output', async () => {
   const rootDir = makeTempDir();
 
   fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ SITE_NAME: 'Docs' }));
@@ -172,7 +181,7 @@ test('build collects named blocks across files and strips definitions from outpu
 
   assert.equal(
     fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'),
-    `<body><header>Fast build - Docs</header> <section class="hero">Fast build</section><!-- built by mssgen -->\n</body>`,
+    `<section class="hero">Fast build</section><body><header>Fast build - Docs</header> <section class="hero">Fast build</section><!-- built by mssgen -->\n</body>`,
   );
   assert.equal(
     fs.readFileSync(path.join(rootDir, 'dist', 'about.html'), 'utf8'),
