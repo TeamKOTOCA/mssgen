@@ -24,6 +24,7 @@ const {
   getWebpRelativePath,
   init,
   injectBuiltByComment,
+  injectNamedBlocks,
   injectParts,
   rewriteAssetReferences,
   shouldConvertImageToWebp,
@@ -34,6 +35,20 @@ const {
 function makeTempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'mssgen-'));
 }
+
+
+test('injectNamedBlocks expands named blocks recursively without colliding with parts syntax', () => {
+  const result = injectNamedBlocks([
+    '{{{{ hero }}}}',
+    '{{{ name: hero;<section>{{{{ title }}}} {{header}}</section>}}}',
+    '{{{ name: title;Hello}}}',
+  ].join(''), {
+    hero: '<main>{{{{ title }}}}</main>',
+    title: 'Welcome',
+  });
+
+  assert.equal(result, '<main>Welcome</main>');
+});
 
 test('injectParts expands parts recursively', () => {
   const result = injectParts('{{page}}', {
@@ -105,6 +120,41 @@ test('rewriteAssetReferences updates local image links to webp', () => {
   assert.match(result, /images\/photo\.webp\?ver=1/);
   assert.match(result, /images\/cover\.webp#hero/);
   assert.match(result, /\/images\/photo\.webp/);
+});
+
+
+test('build collects named blocks across files and strips definitions from output', async () => {
+  const rootDir = makeTempDir();
+
+  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ SITE_NAME: 'Docs' }));
+  fs.writeFileSync(
+    path.join(rootDir, 'index.html'),
+    [
+      '{{{ name: hero;<section class="hero">{{{{ tagline }}}}</section>}}}',
+      '<body>{{header.html}} {{{{ hero }}}}</body>',
+    ].join(''),
+  );
+  fs.writeFileSync(path.join(rootDir, 'about.html'), '<main>{{{{ hero }}}}</main>');
+  fs.mkdirSync(path.join(rootDir, 'common'), { recursive: true });
+  fs.writeFileSync(
+    path.join(rootDir, 'common', 'header.html'),
+    '<header>{{{{ tagline }}}} - {SITE_NAME}</header>',
+  );
+  fs.writeFileSync(
+    path.join(rootDir, 'common', 'defs.html'),
+    '{{{ name: tagline;Fast build}}}',
+  );
+
+  await build(rootDir);
+
+  assert.equal(
+    fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'),
+    `<body><header>Fast build - Docs</header> <section class="hero">Fast build</section><!-- built by mssgen -->\n</body>`,
+  );
+  assert.equal(
+    fs.readFileSync(path.join(rootDir, 'dist', 'about.html'), 'utf8'),
+    `<main><section class="hero">Fast build</section></main>\n<!-- built by mssgen -->`,
+  );
 });
 
 test('build converts png and jpg assets to webp and rewrites html/css/js references', async () => {
