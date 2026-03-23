@@ -5,6 +5,7 @@ mssgen は、HTML をそのまま書きながら静的サイトを組み立て�
 - `npm install mssgen` で使い始められる
 - `npx mssgen` / `npx mssgen dev` ですぐ試せる
 - `common/` に共通パーツを置いて `{{header.html}}` のように読み込める
+- `{{{ name: キー;内容 }}}` で名前付きブロックを定義し、`{{{{ key }}}}` で別ファイルから再利用できる
 - `setting.json` の値を `{SITE_NAME}` のようなプレースホルダーへ差し込める
 - `png` / `jpg` / `jpeg` を `webp` に変換し、ローカル参照も自動で `.webp` に更新できる
 
@@ -130,6 +131,23 @@ npx mssgen
 ```html
 <title>{SITE_NAME}</title>
 ```
+
+### 名前付きブロックの再利用
+`{{{ name: キー;内容 }}}` をどこかのテキストファイルに書くと、その定義自体は出力から除去され、ほかの HTML / CSS / JS / テキストファイルから `{{{{ key }}}}` で再利用できます。
+
+```html
+<!-- landing.html -->
+{{{ name: hero;<section class="hero">{SITE_NAME}</section>}}}
+
+<!-- about.html -->
+<main>
+  {{{{ hero }}}}
+</main>
+```
+
+- 既存の `{{part.html}}` や `{SETTING_KEY}` と衝突しないよう、専用の 3 重 / 4 重ブレースだけを解釈します
+- ビルド前に名前付きブロックを 1 回収集してから展開するので、ファイルごとに再探索せず高速です
+- 再帰参照や未定義キーは警告を出して安全にスキップします
 
 ### 画像の自動変換
 `png` / `jpg` / `jpeg` はビルド時に `webp` へ変換されます。
