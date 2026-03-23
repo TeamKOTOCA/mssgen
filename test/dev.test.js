@@ -15,6 +15,7 @@ const {
   createLiveReloadFallbackHtml,
   diffWatcherSnapshots,
   injectLiveReloadSnippet,
+  resolveExistingRequestPath,
   resolveRequestPath,
 } = require('../lib/builder');
 
@@ -38,6 +39,18 @@ test('resolveRequestPath serves directories and extensionless routes from dist',
 
   assert.equal(resolveRequestPath(rootDir, '/guide/'), path.join(rootDir, 'dist', 'guide', 'index.html'));
   assert.equal(resolveRequestPath(rootDir, '/about'), path.join(rootDir, 'dist', 'about.html'));
+});
+
+test('resolveExistingRequestPath returns only existing files', () => {
+  const rootDir = makeTempProject();
+  fs.mkdirSync(path.join(rootDir, 'dist', 'guide'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'dist', 'guide', 'index.html'), 'guide');
+
+  assert.equal(
+    resolveExistingRequestPath(rootDir, '/guide/'),
+    path.join(rootDir, 'dist', 'guide', 'index.html'),
+  );
+  assert.equal(resolveExistingRequestPath(rootDir, '/missing'), null);
 });
 
 
