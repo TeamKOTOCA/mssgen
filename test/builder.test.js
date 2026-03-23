@@ -59,6 +59,29 @@ test('injectParts expands parts recursively', () => {
   assert.equal(result, '<main><header>Title</header></main>');
 });
 
+
+test('injectParts ignores named block definitions and references', () => {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(message);
+
+  try {
+    const content = [
+      '{{{ name: hero;<section>{SITE_NAME}</section>}}}',
+      '{{{{ hero }}}}',
+      '{{header}}',
+    ].join('\n');
+    const result = injectParts(content, {
+      header: '<header>Title</header>',
+    });
+
+    assert.equal(result, '{{{ name: hero;<section>{SITE_NAME}</section>}}}\n{{{{ hero }}}}\n<header>Title</header>');
+    assert.deepEqual(warnings, []);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test('shouldIgnoreRelativePath skips only global watch/build exclusions', () => {
   assert.equal(shouldIgnoreRelativePath('dist/index.html'), true);
   assert.equal(shouldIgnoreRelativePath('.mssgen-cache/assets.json'), true);
