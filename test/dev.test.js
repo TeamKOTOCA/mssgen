@@ -12,6 +12,7 @@ const {
   createDevServer,
   createWatcher,
   createWatcherSnapshot,
+  createLiveReloadFallbackHtml,
   diffWatcherSnapshots,
   injectLiveReloadSnippet,
   resolveRequestPath,
@@ -37,6 +38,44 @@ test('resolveRequestPath serves directories and extensionless routes from dist',
 
   assert.equal(resolveRequestPath(rootDir, '/guide/'), path.join(rootDir, 'dist', 'guide', 'index.html'));
   assert.equal(resolveRequestPath(rootDir, '/about'), path.join(rootDir, 'dist', 'about.html'));
+});
+
+
+test('createLiveReloadFallbackHtml returns html that retries via live reload', () => {
+  const html = createLiveReloadFallbackHtml('/missing/page');
+
+  assert.match(html, /Rebuilding\.\.\./);
+  assert.match(html, /missing\/page/);
+  assert.match(html, /__mssgen\/livereload/);
+});
+
+test('dev server returns a live-reload fallback html for missing pages', async () => {
+  const rootDir = makeTempProject();
+  const { server } = createDevServer(rootDir);
+
+  await new Promise((resolve) => server.listen(0, resolve));
+  const { port } = server.address();
+
+  const response = await new Promise((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}/missing`, (res) => {
+      let data = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => resolve({
+        statusCode: res.statusCode,
+        contentType: res.headers['content-type'],
+        body: data,
+      }));
+    }).on('error', reject);
+  });
+
+  server.close();
+  assert.equal(response.statusCode, 404);
+  assert.match(response.contentType, /text\/html/);
+  assert.match(response.body, /Rebuilding\.\.\./);
+  assert.match(response.body, /__mssgen\/livereload/);
 });
 
 test('dev server injects live reload script into html responses', async () => {
@@ -139,6 +178,42 @@ test('dev server rebuilds once when a missing request arrives before the watcher
   assert.match(response.body, /updated/);
 });
 
+
+
+test('createWatcher emits batched changes once per debounce window', async () => {
+  const rootDir = makeTempProject();
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>ok</body></html>');
+
+  const watcher = createWatcher(rootDir);
+  const batchPromise = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      watcher.close();
+      reject(new Error('watcher did not emit a batch event'));
+    }, WATCH_POLL_INTERVAL_MS * 6);
+
+    watcher.on('batch', (changes) => {
+      clearTimeout(timeout);
+      watcher.close();
+      resolve(changes.map(({ eventName, filePath }) => ({
+        eventName,
+        relativePath: path.relative(rootDir, filePath),
+      })));
+    });
+  });
+
+  setTimeout(() => {
+    fs.mkdirSync(path.join(rootDir, 'guide'), { recursive: true });
+    fs.writeFileSync(path.join(rootDir, 'guide', 'index.html'), '<html><body>guide</body></html>');
+    fs.writeFileSync(path.join(rootDir, 'index.html'), '<html><body>updated</body></html>');
+  }, WATCH_POLL_INTERVAL_MS);
+
+  const changes = await batchPromise;
+
+  assert.deepEqual(changes, [
+    { eventName: 'add', relativePath: 'guide/index.html' },
+    { eventName: 'change', relativePath: 'index.html' },
+  ]);
+});
 
 test('diffWatcherSnapshots detects add, change, and unlink events in order', () => {
   const previousSnapshot = new Map([
