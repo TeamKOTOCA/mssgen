@@ -1,6 +1,6 @@
 {
   "name": "mssgen",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Minimal static site generator with recursive root-based build",
   "repository": {
     "type": "git",
