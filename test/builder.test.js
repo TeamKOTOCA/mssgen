@@ -51,6 +51,17 @@ test('injectNamedBlocks expands named blocks recursively without colliding with 
   assert.equal(result, '<main>Welcome</main><section>Welcome {{header}}</section>Hello');
 });
 
+test('injectNamedBlocks expands named block definition contents in place', () => {
+  const result = injectNamedBlocks(
+    '<article>{{{ name: hero;<section>{{{{ title }}}}</section>}}}</article>',
+    {
+      title: 'Published',
+    },
+  );
+
+  assert.equal(result, '<article><section>Published</section></article>');
+});
+
 
 test('stripNamedBlockDefinitions leaves the block content in place', () => {
   assert.equal(
