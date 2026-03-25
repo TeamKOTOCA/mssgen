@@ -169,7 +169,7 @@ test('rewriteAssetReferences updates local image links to webp', () => {
 test('build collects named blocks across files while leaving definition contents in output', async () => {
   const rootDir = makeTempDir();
 
-  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ SITE_NAME: 'Docs' }));
+  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ variables: { SITE_NAME: 'Docs' } }));
   fs.writeFileSync(
     path.join(rootDir, 'index.html'),
     [
@@ -203,7 +203,7 @@ test('build collects named blocks across files while leaving definition contents
 test('build converts png and jpg assets to webp and rewrites html/css/js references', async () => {
   const rootDir = makeTempDir();
 
-  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ TITLE: 'Hello' }));
+  fs.writeFileSync(path.join(rootDir, 'setting.json'), JSON.stringify({ variables: { TITLE: 'Hello' } }));
   fs.writeFileSync(
     path.join(rootDir, 'index.html'),
     '<body>{{header.html}} <img src="./assets/logo.png?cache=1"><script src="./assets/app.js"></script></body>',
@@ -254,8 +254,36 @@ test('build converts png and jpg assets to webp and rewrites html/css/js referen
   assert.ok(fs.statSync(path.join(rootDir, 'dist', 'assets', 'logo.webp')).size > 0);
   assert.ok(fs.statSync(path.join(rootDir, 'dist', 'assets', 'photo.webp')).size > 0);
   assert.equal(shouldConvertImageToWebp('assets/logo.png'), true);
+  assert.equal(shouldConvertImageToWebp('assets/logo.png', new Set(['assets/logo.png'])), false);
   assert.equal(shouldConvertImageToWebp('assets/photo.jpg'), true);
   assert.equal(getWebpRelativePath('assets/photo.jpg'), 'assets/photo.webp');
+});
+
+test('build skips webp conversion for files listed in setting.json build.webpExclude', async () => {
+  const rootDir = makeTempDir();
+
+  fs.writeFileSync(
+    path.join(rootDir, 'setting.json'),
+    JSON.stringify({ build: { webpExclude: ['assets/logo.png'] } }),
+  );
+  fs.writeFileSync(
+    path.join(rootDir, 'index.html'),
+    '<body><img src="./assets/logo.png"><img src="./assets/photo.jpg"></body>',
+  );
+  fs.mkdirSync(path.join(rootDir, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'assets', 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
+  fs.writeFileSync(path.join(rootDir, 'assets', 'photo.jpg'), Buffer.from(JPEG_BASE64, 'base64'));
+
+  await build(rootDir);
+
+  assert.equal(
+    fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'),
+    '<body><img src="./assets/logo.png"><img src="assets/photo.webp"><!-- built by mssgen -->\n</body>',
+  );
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'logo.png')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'logo.webp')), false);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'photo.jpg')), false);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'photo.webp')), true);
 });
 
 test('build keeps the previous dist contents available until the next build is ready', async () => {
