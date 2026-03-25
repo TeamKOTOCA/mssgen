@@ -9,7 +9,8 @@
 - 特徴: 特定の `src/` フォルダを必要とせず、カレントディレクトリ全体を処理対象とする
 
 ## コア機能
-- Variable Injection (`{KEY}`): `setting.json` の値を全テキストファイルの `{KEY}` に埋め込む
+- Variable Injection (`{KEY}`): `setting.json` の `variables` 値を全テキストファイルの `{KEY}` に埋め込む
+- WebP除外設定 (`build.webpExclude`): `setting.json` の `build.webpExclude` 配列で指定した画像は WebP 変換対象から除外
 - Component Embedding (`{{parts}}`): `common/` 内のファイルを `{{filename}}` で呼び出し、再帰的に展開する
 - Recursive Build: サブディレクトリ構造を維持したまま `dist/` へ出力する
 - Smart Copy: テキストファイルは置換処理を行い、画像などのバイナリファイルはそのままコピーする
@@ -33,7 +34,7 @@
 - ビルド対象外: `dist/`, `node_modules/`, `.git/`, `common/`, `setting.json`, `package.json`, `package-lock.json`
 - 監視対象外: `dist/`, `node_modules/`, `.git/`, `package.json`, `package-lock.json`（`common/`, `setting.json` はライブリロード対象）
 - 置換順序: 常に `{{parts}}` → `{key}` → 画像参照の `.webp` 置換
-- 画像変換: `png`, `jpg`, `jpeg` はビルド時に `sharp` で `webp` へ変換し、HTML/CSS/JS 内のローカル参照も追従させる
+- 画像変換: `png`, `jpg`, `jpeg` はビルド時に `sharp` で `webp` へ変換し、HTML/CSS/JS 内のローカル参照も追従させる（`setting.json` の `build.webpExclude` 指定分は除外）
 - バイナリ判定: 画像や圧縮ファイルなどは置換を通さずコピー
 - エラー方針: `setting.json` の読み込み失敗や `common/` パーツ未検出は警告を出して継続
 
