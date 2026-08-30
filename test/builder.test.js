@@ -21,6 +21,8 @@ globalThis.__MSSGEN_TEST_SHARP__ = (inputPath) => ({
 const {
   build,
   getSourceFiles,
+  getExcludedDirectoryPaths,
+  isInAssetsDirectory,
   getWebpRelativePath,
   init,
   injectBuiltByComment,
@@ -28,6 +30,7 @@ const {
   injectParts,
   rewriteAssetReferences,
   shouldConvertImageToWebp,
+  isInExcludedDirectory,
   shouldIgnoreRelativePath,
   splitResourceSuffix,
   stripNamedBlockDefinitions,
@@ -147,22 +150,22 @@ test('splitResourceSuffix separates query strings and hashes', () => {
   });
 });
 
-test('rewriteAssetReferences updates local image links to webp', () => {
+test('rewriteAssetReferences updates local assets image links to webp', () => {
   const content = [
-    '<img src="./images/photo.png?ver=1">',
-    '<script>const poster = "./images/cover.jpg#hero";</script>',
-    '<style>.hero{background:url("/images/photo.png")}</style>',
+    '<img src="./assets/photo.png?ver=1">',
+    '<script>const poster = "./assets/cover.jpg#hero";</script>',
+    '<style>.hero{background:url("/assets/photo.png")}</style>',
   ].join('\n');
   const convertedAssetMap = new Map([
-    ['images/photo.png', 'images/photo.webp'],
-    ['images/cover.jpg', 'images/cover.webp'],
+    ['assets/photo.png', 'assets/photo.webp'],
+    ['assets/cover.jpg', 'assets/cover.webp'],
   ]);
 
   const result = rewriteAssetReferences(content, 'index.html', convertedAssetMap);
 
-  assert.match(result, /images\/photo\.webp\?ver=1/);
-  assert.match(result, /images\/cover\.webp#hero/);
-  assert.match(result, /\/images\/photo\.webp/);
+  assert.match(result, /assets\/photo\.webp\?ver=1/);
+  assert.match(result, /assets\/cover\.webp#hero/);
+  assert.match(result, /\/assets\/photo\.webp/);
 });
 
 
@@ -253,9 +256,14 @@ test('build converts png and jpg assets to webp and rewrites html/css/js referen
   assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'photo.webp')), true);
   assert.ok(fs.statSync(path.join(rootDir, 'dist', 'assets', 'logo.webp')).size > 0);
   assert.ok(fs.statSync(path.join(rootDir, 'dist', 'assets', 'photo.webp')).size > 0);
+  assert.equal(isInAssetsDirectory('assets/logo.png'), true);
+  assert.equal(isInAssetsDirectory('nested/assets/logo.png'), true);
+  assert.equal(isInAssetsDirectory('images/logo.png'), false);
   assert.equal(shouldConvertImageToWebp('assets/logo.png'), true);
   assert.equal(shouldConvertImageToWebp('assets/logo.png', new Set(['assets/logo.png'])), false);
   assert.equal(shouldConvertImageToWebp('assets/photo.jpg'), true);
+  assert.equal(shouldConvertImageToWebp('images/photo.jpg'), false);
+  assert.equal(shouldConvertImageToWebp('nested/assets/photo.jpg'), true);
   assert.equal(getWebpRelativePath('assets/photo.jpg'), 'assets/photo.webp');
 });
 
@@ -284,6 +292,26 @@ test('build skips webp conversion for files listed in setting.json build.webpExc
   assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'logo.webp')), false);
   assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'photo.jpg')), false);
   assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'photo.webp')), true);
+});
+
+
+test('rewriteAssetReferences only updates images under assets directories', () => {
+  const content = [
+    '<img src="./assets/photo.png">',
+    '<img src="./images/photo.png">',
+    '<img src="./nested/assets/photo.jpg">',
+  ].join('\n');
+  const convertedAssetMap = new Map([
+    ['assets/photo.png', 'assets/photo.webp'],
+    ['images/photo.png', 'images/photo.webp'],
+    ['nested/assets/photo.jpg', 'nested/assets/photo.webp'],
+  ]);
+
+  const result = rewriteAssetReferences(content, 'index.html', convertedAssetMap);
+
+  assert.match(result, /assets\/photo\.webp/);
+  assert.match(result, /images\/photo\.png/);
+  assert.match(result, /nested\/assets\/photo\.webp/);
 });
 
 test('build keeps the previous dist contents available until the next build is ready', async () => {
@@ -353,6 +381,68 @@ test('build reuses cached webp output when the source image is unchanged', async
   assert.equal(convertCount, 1);
   assert.equal(fs.existsSync(path.join(rootDir, '.mssgen-cache', 'assets.json')), true);
   assert.equal(fs.existsSync(path.join(rootDir, '.mssgen-cache', 'outputs', 'assets', 'logo.webp')), true);
+});
+
+
+
+test('build excludes folders listed in setting.json build.excludeDirs from source output', async () => {
+  const rootDir = makeTempDir();
+
+  fs.writeFileSync(
+    path.join(rootDir, 'setting.json'),
+    JSON.stringify({ build: { excludeDirs: ['drafts', 'nested/private'] } }),
+  );
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<body>public</body>');
+  fs.mkdirSync(path.join(rootDir, 'drafts'), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, 'nested', 'private'), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, 'nested', 'public'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'drafts', 'index.html'), '<body>draft</body>');
+  fs.writeFileSync(path.join(rootDir, 'nested', 'private', 'secret.html'), '<body>secret</body>');
+  fs.writeFileSync(path.join(rootDir, 'nested', 'public', 'ok.html'), '<body>ok</body>');
+
+  const excludedDirs = getExcludedDirectoryPaths({ build: { excludeDirs: ['drafts', 'nested/private'] } });
+  assert.equal(isInExcludedDirectory('drafts/index.html', excludedDirs), true);
+  assert.equal(isInExcludedDirectory('nested/private/secret.html', excludedDirs), true);
+  assert.equal(isInExcludedDirectory('nested/public/ok.html', excludedDirs), false);
+
+  const builtCount = await build(rootDir);
+
+  assert.equal(builtCount, 2);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'index.html')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'drafts', 'index.html')), false);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'nested', 'private', 'secret.html')), false);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'nested', 'public', 'ok.html')), true);
+});
+
+test('build can use setting.json build.rootDir as the source root', async () => {
+  const rootDir = makeTempDir();
+
+  fs.writeFileSync(
+    path.join(rootDir, 'setting.json'),
+    JSON.stringify({ variables: { TITLE: 'Scoped' }, build: { rootDir: 'site' } }),
+  );
+  fs.writeFileSync(path.join(rootDir, 'index.html'), '<body>outside</body>');
+  fs.mkdirSync(path.join(rootDir, 'site', 'common'), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, 'site', 'assets'), { recursive: true });
+  fs.mkdirSync(path.join(rootDir, 'site', 'images'), { recursive: true });
+  fs.writeFileSync(path.join(rootDir, 'site', 'common', 'header.html'), '<header>{TITLE}</header>');
+  fs.writeFileSync(
+    path.join(rootDir, 'site', 'index.html'),
+    '<body>{{header.html}}<img src="./assets/logo.png"><img src="./images/photo.jpg"></body>',
+  );
+  fs.writeFileSync(path.join(rootDir, 'site', 'assets', 'logo.png'), Buffer.from(PNG_BASE64, 'base64'));
+  fs.writeFileSync(path.join(rootDir, 'site', 'images', 'photo.jpg'), Buffer.from(JPEG_BASE64, 'base64'));
+
+  const builtCount = await build(rootDir);
+
+  assert.equal(builtCount, 3);
+  assert.equal(
+    fs.readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8'),
+    '<body><header>Scoped</header><img src="assets/logo.webp"><img src="./images/photo.jpg"><!-- built by mssgen -->\n</body>',
+  );
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'assets', 'logo.webp')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'images', 'photo.jpg')), true);
+  assert.equal(fs.existsSync(path.join(rootDir, 'dist', 'images', 'photo.webp')), false);
 });
 
 test('init creates the required project scaffold without overwriting existing files', () => {
